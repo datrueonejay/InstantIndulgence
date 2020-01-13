@@ -105,3 +105,8 @@ dist
 
 # Firebase
 .firebaserc
+
+# Firebase Scripts
+set_env.sh
+set_env.bat
+.runtimeconfig.json

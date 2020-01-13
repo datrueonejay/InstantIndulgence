@@ -14,5 +14,6 @@
   "bugs": {
     "url": "https://github.com/datrueonejay/InstantIndulgence/issues"
   },
-  "homepage": "https://github.com/datrueonejay/InstantIndulgence#readme"
+  "homepage": "https://github.com/datrueonejay/InstantIndulgence#readme",
+  "dependencies": {}
 }
