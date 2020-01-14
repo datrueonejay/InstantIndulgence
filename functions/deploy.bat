@@ -1,2 +1,2 @@
-CALL ./set_env.sh
+CALL .\set_env.bat
 CALL firebase deploy --only functions
