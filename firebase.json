@@ -9,7 +9,8 @@
       ".eslintrc.json",
       ".gitignore",
       ".runtimeconfig.json",
-      "node_modules"
+      "node_modules",
+      "*.log"
     ]
   }
 }

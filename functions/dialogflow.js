@@ -11,6 +11,7 @@ app.intent("Default Welcome Intent", conv => {
 app.intent("Cuisines", conv => {
   return getCuisines(1, 1)
     .then(res => {
+      console.log(res);
       conv.ask(`The different cuisines are ${res}`);
       return;
     })
