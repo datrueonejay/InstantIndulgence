@@ -24,11 +24,21 @@ function getOptions(path, queryStrings, headers) {
 }
 
 const getCuisines = (lat, long) => {
-  return request(getOptions("/cuisines", (headers = { lat: lat ? lat : defaultLat, lon: long ? long : defaultLong })))
+  return request(
+    getOptions("/cuisines", (queryStrings = { lat: lat ? lat : defaultLat, lon: long ? long : defaultLong }))
+  )
     .then((res) => {
-      let cuisines = [];
+      let cuisines = {};
       res.cuisines.forEach((cuisine) => {
-        cuisines.push(cuisine["cuisine"]["cuisine_name"]);
+        let name = cuisine["cuisine"]["cuisine_name"];
+        let id = cuisine["cuisine"]["cuisine_id"];
+        cuisines[name] = id;
+        // console.log(cuisine);
+        // cuisines.push({
+        //   name: cuisine["cuisine"]["cuisine_name"],
+        //   id: cuisine["cuisine"]["cuisine_id"],
+        // });
+        // cuisines.push(cuisine["cuisine"]["cuisine_name"]);
       });
       return cuisines;
     })
@@ -37,6 +47,45 @@ const getCuisines = (lat, long) => {
     });
 };
 
+const getRestaurants = (lat, long, cuisineIds, page, count) => {
+  let cuisines = "";
+  cuisineIds.forEach((id) => {
+    cuisines = cuisines.concat(`${id.toString()},`);
+  });
+  cuisines = cuisines.slice(0, -1);
+  console.log(cuisines);
+  return request(
+    getOptions(
+      "/search",
+      (queryStrings = {
+        lat: lat ? lat : defaultLat,
+        lon: long ? long : defaultLong,
+        cuisines: cuisines,
+        start: page * count,
+        count: count,
+      })
+    )
+  )
+    .then((res) => {
+      let restaurants = res.restaurants;
+      let names = [];
+      let a = 0;
+      restaurants.forEach((info) => {
+        if (a === 0) {
+          console.log(info.restaurant);
+          a++;
+        }
+        let restaurant = info.restaurant;
+        names.push(restaurant.name);
+      });
+      return names;
+    })
+    .catch((err) => {
+      throw err;
+    });
+};
+
 module.exports = {
   getCuisines: getCuisines,
+  getRestaurants: getRestaurants,
 };
