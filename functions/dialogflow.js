@@ -1,12 +1,13 @@
-const { dialogflow, Permission, List } = require("actions-on-google");
+const { dialogflow, Permission, List, BasicCard, Button } = require("actions-on-google");
+const qs = require("querystring");
 
-const { getCuisines, getRestaurants } = require("./zomato");
+const { getCuisines, getRestaurants, getRestaurantInfo } = require("./zomato");
 
 const app = dialogflow();
 
 app.intent("Default Welcome Intent", (conv) => {
-  conv.ask("Welcome to Instant Indulgence, from firebase");
-  return conv.ask(
+  conv.ask("Welcome to Instant Indulgence, from firebase powered by Zomato");
+  conv.ask(
     new Permission({
       context: "To locate restaurants near you",
       permissions: "DEVICE_PRECISE_LOCATION",
@@ -14,48 +15,26 @@ app.intent("Default Welcome Intent", (conv) => {
   );
 });
 
-// app.intent("Cuisines", (conv) => {
-//   if (conv.data.cuisines) {
-//     conv.ask(`Already found from before. The different cuisines are ${conv.data.cuisines}`);
-//     return;
-//   }
-
-//   let latitude = null;
-//   let longitude = null;
-
-//   if (conv.device.location) {
-//     ({ latitude, longitude } = conv.device.location.coordinates);
-//   }
-
-//   return getCuisines(latitude, longitude)
-//     .then((res) => {
-//       conv.data.cuisines = res;
-
-//       conv.ask(`The different cuisines are ${res}`);
-//       return;
-//     })
-//     .catch((err) => {
-//       throw err;
-//     });
-// });
+// TODO: Parse and clean input
 
 app.intent("Add Cuisine", (conv, params) => {
+  // TODO: Don't read cuisines, also remove cuisine
   let cuisines = params.cuisine;
 
   // Save cuisines that are valid
   let success = [];
-  let ids = conv.data.search ? conv.data.search : [];
-  // console.log(conv.data.cuisines);
+
+  // Stored as a list, but data is added as a set
+  let ids = conv.data.ids ? new Set(conv.data.ids) : new Set();
   cuisines.forEach((cuisine) => {
     // Check that cuisine is valid
     if (cuisine in conv.data.cuisines) {
       // Add to search criteria
-      ids.push(conv.data.cuisines[cuisine]);
+      ids.add(conv.data.cuisines[cuisine]);
       success.push(cuisine);
     }
   });
-  console.log(ids);
-  conv.data.ids = ids;
+  conv.data.ids = Array.from(ids);
   if (success.length == 0) {
     return conv.ask("Could not add any of the given types of food, try others.");
   }
@@ -63,7 +42,7 @@ app.intent("Add Cuisine", (conv, params) => {
 });
 
 app.intent("Find Restaurants", (conv, input) => {
-  if (!conv.data.ids || conv.data.ids.length === 0) {
+  if (!conv.data.ids || conv.data.ids.size === 0) {
     return conv.ask("Looks like you haven't added any cuisines yet!");
   }
 
@@ -75,9 +54,17 @@ app.intent("Find Restaurants", (conv, input) => {
   }
 
   return getRestaurants(latitude, longitude, conv.data.ids ? conv.data.ids : [], 1, 10).then((res) => {
-    // console.log(res);
-    conv.ask(`Some restaurants near you are`);
-    return conv.ask(listFormatter(res));
+    // Screen
+    if (conv.screen) {
+      // if (hasScreen(conv)) {
+      conv.ask(`Here are some restaurants near you.`);
+      return conv.ask(listFormatter(res));
+    }
+    // Audio only
+    else {
+      // TODO: Fix up if audio only
+      conv.ask(`Some restaurants near you are ${res[0].name}`);
+    }
   });
 });
 
@@ -116,6 +103,33 @@ app.intent("Location Followup", (conv, input, granted) => {
     });
 });
 
+app.intent("Select Restaurant", (conv, input, option) => {
+  console.log(option);
+  return getRestaurantInfo(option).then((info) => {
+    let mapQuery = qs.escape(`${info.name} ${info.address}`);
+    conv.ask(`Here's more information on ${info.name}`);
+    return conv.ask(
+      new BasicCard({
+        buttons: [
+          new Button({
+            title: `Open in Maps`,
+            url: `https://www.google.com/maps/search/?api=1&query=${mapQuery}`,
+          }),
+          // Only One button is supported currently
+          // new Button({
+          //   title: `Open in Zomato`,
+          //   url: info.url,
+          // }),
+        ],
+        image: { url: info.image, accessibilityText: `Image for ${info.name}` },
+        title: info.name,
+        // subtitle: info.address,
+        text: `Address: ${info.address}  \nPhone: ${info.phone}  \nRating: ${info.rating}/5  \nPrice Range: ${info.price}`,
+      })
+    );
+  });
+});
+
 app.intent("Goodbye", (conv) => {
   conv.close("Goodbye!");
 });
@@ -129,11 +143,26 @@ app.intent("Default Fallback Intent", (conv) => {
   conv.ask(`I didn't understand. Can you try again? From firebase`);
 });
 
-// Turn a list of strings into a list for dialogflow response
-const listFormatter = (items) => {
+// Check if current conv has a screen
+const hasScreen = (conv) => {
+  return conv.surface.capabilities.has("actions.capability.SCREEN_OUTPUT");
+};
+
+// Turn a list of restaurants into a list for dialogflow response
+const listFormatter = (restaurants) => {
   let newItems = {};
-  items.forEach((item) => {
-    newItems[item] = { title: item };
+  restaurants.forEach((restaurant) => {
+    newItems[restaurant.id] = {
+      title: restaurant.name,
+      description: `${restaurant.address}`,
+      image: {
+        url: restaurant.image,
+        accessibilityText: `Image for ${restaurant.name}`,
+      },
+      optionInfo: {
+        key: restaurant.id,
+      },
+    };
   });
   return new List({
     items: newItems,
